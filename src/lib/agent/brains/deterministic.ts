@@ -351,8 +351,10 @@ export class DeterministicBrain implements Brain {
     const lookup = resultOf<{ ok: boolean; found: boolean; customer?: { name: string } }>(results, "lookup_customer");
     const details = resultOf<{ ok: boolean; stillMissing?: string[] }>(results, "record_caller_details");
 
-    if (details?.stillMissing?.length && slots.chosenSlotId && !slots.bookingId) {
-      return { say: askFor(details.stillMissing[0]), toolCalls: [], nextState: "schedule" };
+    const selection = resultOf<{ ok: boolean; stillMissing?: string[] }>(results, "select_slot");
+    const nextMissing = selection?.stillMissing?.[0] ?? details?.stillMissing?.[0];
+    if (nextMissing && slots.chosenSlotId && !slots.bookingId) {
+      return { say: askFor(nextMissing), toolCalls: [], nextState: "schedule" };
     }
 
     if (lookup?.found && lookup.customer) {
@@ -549,13 +551,17 @@ export class DeterministicBrain implements Brain {
         (isAffirmative(utterance) ? offered[0] : undefined);
 
       if (chosen) {
-        slots.chosenSlotId = chosen.slotId;
         const missing: string[] = [];
         if (!slots.callerName && !details.name) missing.push("name");
         if (!slots.phone && !details.phone && !session.fromNumber) missing.push("phone");
         if (!slots.address && !details.address) missing.push("address");
 
         if (missing.length > 0) {
+          // Record the choice through a tool rather than writing to the session, so the
+          // value the state machine later gates on has an entry in the audit trail.
+          if (available.has("select_slot") && slots.chosenSlotId !== chosen.slotId) {
+            toolCalls.push(this.call("select_slot", { slotId: chosen.slotId }));
+          }
           return { say: askFor(missing[0]), toolCalls, nextState: "schedule" };
         }
 

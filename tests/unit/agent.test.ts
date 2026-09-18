@@ -213,6 +213,37 @@ describe("turn runner", () => {
   });
 });
 
+describe("slot selection", () => {
+  it("records the chosen window and reports what is still missing", async () => {
+    const slotId = "tech_dana:2026-09-22T15:00:00.000Z";
+    const brain = new ScriptedBrain([{ say: "Noted.", toolCalls: [{ id: "t1", name: "select_slot", args: { slotId } }] }]);
+    const { runner } = makeRunner(brain);
+    runner.open();
+    runner.session.state = "schedule";
+    runner.session.slots = { symptomId: "washer_not_draining", offeredSlotIds: [slotId], callerName: "Sam" };
+
+    const result = await runner.turn("the second one");
+    const payload = result.toolCalls[0]?.result as { ok: boolean; stillMissing: string[] };
+
+    expect(payload.ok).toBe(true);
+    expect(payload.stillMissing).toEqual(["phone", "address"]);
+    expect(runner.session.slots.chosenSlotId).toBe(slotId);
+  });
+
+  it("refuses a window that was never offered, leaving the slot unset", async () => {
+    const brain = new ScriptedBrain([
+      { say: "Noted.", toolCalls: [{ id: "t1", name: "select_slot", args: { slotId: "tech_dana:2026-12-01T15:00:00.000Z" } }] },
+    ]);
+    const { runner } = makeRunner(brain);
+    runner.open();
+    runner.session.state = "schedule";
+    runner.session.slots = { symptomId: "washer_not_draining", offeredSlotIds: ["tech_dana:2026-09-22T15:00:00.000Z"] };
+
+    await runner.turn("book me for december");
+    expect(runner.session.slots.chosenSlotId).toBeUndefined();
+  });
+});
+
 describe("booking safety", () => {
   it("refuses a slot that was never offered on this call", async () => {
     const brain = new ScriptedBrain([

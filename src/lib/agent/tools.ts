@@ -347,6 +347,59 @@ const checkAvailability = defineTool({
   },
 });
 
+/* ---------------------------------------------------------------- select_slot ---- */
+
+const selectSlotSchema = z.object({
+  slotId: z.string().describe("A slotId returned by check_availability in this call."),
+});
+
+/**
+ * Records which window the caller picked, separately from booking it.
+ *
+ * These are two different facts and they arrive at different moments: a caller says
+ * "the second one" long before they have given an address. Without this tool the
+ * dialogue manager would have to hold the choice in its own memory - which does not
+ * survive a stateless request - or write it into the session behind the runner's back,
+ * which puts an unaudited value in front of a state-machine gate.
+ */
+const selectSlot = defineTool({
+  name: "select_slot",
+  description:
+    "Record the arrival window the caller has chosen. Call this the moment they pick one, before you start " +
+    "collecting their details. It does not book anything.",
+  schema: selectSlotSchema,
+  jsonSchema: {
+    type: "object",
+    properties: { slotId: { type: "string", description: "Exact slotId from check_availability." } },
+    required: ["slotId"],
+    additionalProperties: false,
+  },
+  allowedStates: ["schedule", "confirm"],
+  mutating: false,
+  async handler(args, ctx) {
+    const slots = ctx.session.slots;
+    if (slots.offeredSlotIds && !slots.offeredSlotIds.includes(args.slotId)) {
+      return fail(
+        "That window was not one of the ones offered on this call.",
+        "Call check_availability and offer the caller one of the labels it returns.",
+      );
+    }
+    const [, startsAt] = splitSlotId(args.slotId);
+    if (!startsAt) return fail("Malformed slotId.");
+
+    slots.chosenSlotId = args.slotId;
+    const missing = ([
+      ["name", "callerName"],
+      ["phone", "phone"],
+      ["address", "address"],
+    ] as const)
+      .filter(([, slot]) => !slots[slot])
+      .map(([label]) => label);
+
+    return ok({ slotId: args.slotId, window: describeSlot(startsAt, ctx.config.timeZone), stillMissing: missing });
+  },
+});
+
 /* ----------------------------------------------------------- book_appointment ---- */
 
 const bookSchema = z.object({
@@ -748,6 +801,7 @@ export const TOOLS: ToolDefinition[] = [
   triageAppliance,
   quoteJob,
   checkAvailability,
+  selectSlot,
   bookAppointment,
   rescheduleAppointment,
   sendNotification,

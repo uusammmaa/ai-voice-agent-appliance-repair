@@ -120,7 +120,7 @@ export class CallRunner {
     }
 
     if (this.session.metrics.turns > this.ctx.config.maxTurns) {
-      return this.forceEscalate("Call exceeded the maximum number of turns.", startedAt);
+      return await this.forceEscalate("Call exceeded the maximum number of turns.", startedAt);
     }
 
     // Low ASR confidence: ask, do not guess. Mishearing an address costs a truck roll.
@@ -171,7 +171,7 @@ export class CallRunner {
           at: this.ctx.now().toISOString(),
           turn: this.session.metrics.turns,
         });
-        return this.forceEscalate("The assistant could not complete the turn.", startedAt);
+        return await this.forceEscalate("The assistant could not complete the turn.", startedAt);
       } finally {
         this.session.metrics.brainMs += Date.now() - brainStart;
       }
@@ -229,7 +229,7 @@ export class CallRunner {
     const stateChanged = this.session.state !== stateBefore;
     this.stalledTurns = stateChanged || executed.length > 0 ? 0 : this.stalledTurns + 1;
     if (this.stalledTurns >= this.ctx.config.maxStalledTurns && this.session.state !== "escalated") {
-      return this.forceEscalate("The call stopped making progress.", startedAt);
+      return await this.forceEscalate("The call stopped making progress.", startedAt);
     }
 
     const ended = endCall || this.session.state === "ended";
@@ -311,13 +311,18 @@ export class CallRunner {
     return executed;
   }
 
-  private forceEscalate(reason: string, startedAt: number): TurnResult {
+  private async forceEscalate(reason: string, startedAt: number): Promise<TurnResult> {
     const say = "Let me get one of the team on the line for you - one moment.";
     this.push("agent", say);
     this.session.state = "escalated";
     this.session.escalation = { reason, at: this.ctx.now().toISOString() };
     this.session.outcome = "escalated";
-    void this.ctx.messaging
+    /*
+     * Awaited, not fired and forgotten. On a serverless runtime the process can be
+     * frozen the moment the response is returned, so a dangling promise here is an
+     * alert that silently never arrives - and this is the one alert that matters.
+     */
+    await this.ctx.messaging
       .send({
         channel: "on_call",
         priority: "high",
