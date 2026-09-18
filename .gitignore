@@ -16,5 +16,4 @@ blob-report/
 .playwright/
 tsconfig.tsbuildinfo
 
-.vercel
 .env*
