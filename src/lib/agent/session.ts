@@ -41,6 +41,12 @@ export interface RunnerOptions {
   now?: () => Date;
   /** Injected id source for the same reason. */
   idFactory?: (prefix: string) => string;
+  /**
+   * Resume an existing call instead of starting one. The runner holds no state of its
+   * own beyond the session, which is what lets a stateless HTTP handler rehydrate a
+   * call from the request body and carry on mid-conversation.
+   */
+  session?: CallSession;
 }
 
 export interface TurnResult {
@@ -66,7 +72,7 @@ export class CallRunner {
       options.idFactory ?? ((prefix: string) => `${prefix}_${(++this.idCounter).toString().padStart(4, "0")}`);
 
     this.brain = options.brain;
-    this.session = {
+    this.session = options.session ?? {
       id: sessionId ?? `call_${now().getTime().toString(36)}`,
       startedAt: now().toISOString(),
       state: "greeting",
@@ -99,9 +105,29 @@ export class CallRunner {
     this.session.slots.phone ??= phone;
   }
 
-  /** The line the agent speaks before the caller says anything. */
-  open(): string {
-    const line = greeting(this.ctx.config);
+  /**
+   * Connect the call and speak the opening line.
+   *
+   * The CRM lookup happens here, on caller ID, before the caller has said anything -
+   * which is what a dispatcher with the screen in front of them would do. It means the
+   * agent can greet a regular by name, and it means triage already knows their repair
+   * history by the time they describe the fault. It runs through the tool pipeline
+   * rather than calling the repository directly, so it lands in the audit trail like
+   * every other tool call.
+   */
+  async open(): Promise<string> {
+    if (this.session.fromNumber) {
+      await this.runTools(
+        [{ id: this.ctx.nextId("tool"), name: "lookup_customer", args: { phone: this.session.fromNumber } }],
+        0,
+      );
+    }
+
+    const firstName = this.session.slots.callerName?.split(" ")[0];
+    const line = firstName
+      ? `Thanks for calling ${this.ctx.config.businessName}. Is that ${firstName}? What's going on?`
+      : greeting(this.ctx.config);
+
     this.push("agent", line);
     this.session.state = "identify";
     return line;

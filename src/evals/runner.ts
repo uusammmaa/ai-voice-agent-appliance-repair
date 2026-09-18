@@ -50,7 +50,7 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
   );
 
   if (scenario.fromNumber) runner.setFromNumber(scenario.fromNumber);
-  runner.open();
+  await runner.open();
 
   for (const turn of scenario.turns) {
     tick++;

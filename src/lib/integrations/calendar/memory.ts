@@ -33,7 +33,8 @@ export class MemoryCalendar implements CalendarPort {
       id,
       calendarId: input.calendarId,
       idempotencyKey: input.idempotencyKey,
-      htmlLink: `https://calendar.google.com/calendar/event?eid=${id}`,
+      // Deliberately no htmlLink. Fabricating a calendar.google.com URL here would put a
+      // link in the UI that leads nowhere and implies a write that never happened.
       startsAt: input.startsAt,
       endsAt: input.endsAt,
       summary: input.summary,
