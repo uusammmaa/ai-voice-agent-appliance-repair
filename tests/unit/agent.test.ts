@@ -120,7 +120,7 @@ describe("turn runner", () => {
       { say: "Booking that now.", toolCalls: [{ id: "t1", name: "book_appointment", args: {} }] },
     ]);
     const { runner } = makeRunner(brain);
-    runner.open();
+    await runner.open();
     const result = await runner.turn("hello");
 
     expect(result.toolCalls[0]?.error?.message).toMatch(/not available during identify/);
@@ -132,7 +132,7 @@ describe("turn runner", () => {
       { say: "Looking you up.", toolCalls: [{ id: "t1", name: "lookup_customer", args: { phone: 42 } }] },
     ]);
     const { runner } = makeRunner(brain);
-    runner.open();
+    await runner.open();
     const result = await runner.turn("hi");
 
     expect(result.toolCalls[0]?.error?.message).toMatch(/Invalid arguments/);
@@ -145,7 +145,7 @@ describe("turn runner", () => {
       { say: "Looking you up.", toolCalls: [{ id: "t1", name: "lookup_customer", args: { phone: 42 } }] },
     ]);
     const { runner } = makeRunner(brain, { config: { maxToolRoundsPerTurn: 5 } });
-    runner.open();
+    await runner.open();
     const result = await runner.turn("hi");
 
     expect(result.toolCalls).toHaveLength(2);
@@ -154,7 +154,7 @@ describe("turn runner", () => {
 
   it("asks the caller to repeat a low-confidence turn instead of acting on it", async () => {
     const { runner } = makeRunner();
-    runner.open();
+    await runner.open();
     const result = await runner.turn("mumble crackle", { confidence: 0.1 });
 
     expect(result.say).toMatch(/say that once more/i);
@@ -167,7 +167,7 @@ describe("turn runner", () => {
       respond: vi.fn().mockRejectedValue(new Error("upstream 503")),
     };
     const { runner, messaging } = makeRunner(brain);
-    runner.open();
+    await runner.open();
     const result = await runner.turn("my fridge is broken");
 
     expect(runner.session.state).toBe("escalated");
@@ -186,7 +186,7 @@ describe("turn runner", () => {
       }),
     };
     const { runner } = makeRunner(brain, { config: { maxToolRoundsPerTurn: 2 } });
-    runner.open();
+    await runner.open();
     const result = await runner.turn("hello");
 
     expect(result.toolCalls).toHaveLength(2);
@@ -195,7 +195,7 @@ describe("turn runner", () => {
   it("escalates a call that stops making progress", async () => {
     const brain = new ScriptedBrain([{ say: "Sorry, could you repeat that?", toolCalls: [] }]);
     const { runner } = makeRunner(brain);
-    runner.open();
+    await runner.open();
     await runner.turn("hello");
     await runner.turn("hello");
     await runner.turn("hello");
@@ -207,7 +207,7 @@ describe("turn runner", () => {
   it("never speaks an empty turn", async () => {
     const brain = new ScriptedBrain([{ say: "", toolCalls: [] }]);
     const { runner } = makeRunner(brain);
-    runner.open();
+    await runner.open();
     const result = await runner.turn("hello");
     expect(result.say.length).toBeGreaterThan(0);
   });
@@ -218,7 +218,7 @@ describe("slot selection", () => {
     const slotId = "tech_dana:2026-09-22T15:00:00.000Z";
     const brain = new ScriptedBrain([{ say: "Noted.", toolCalls: [{ id: "t1", name: "select_slot", args: { slotId } }] }]);
     const { runner } = makeRunner(brain);
-    runner.open();
+    await runner.open();
     runner.session.state = "schedule";
     runner.session.slots = { symptomId: "washer_not_draining", offeredSlotIds: [slotId], callerName: "Sam" };
 
@@ -235,7 +235,7 @@ describe("slot selection", () => {
       { say: "Noted.", toolCalls: [{ id: "t1", name: "select_slot", args: { slotId: "tech_dana:2026-12-01T15:00:00.000Z" } }] },
     ]);
     const { runner } = makeRunner(brain);
-    runner.open();
+    await runner.open();
     runner.session.state = "schedule";
     runner.session.slots = { symptomId: "washer_not_draining", offeredSlotIds: ["tech_dana:2026-09-22T15:00:00.000Z"] };
 
@@ -264,7 +264,7 @@ describe("booking safety", () => {
       },
     ]);
     const { runner } = makeRunner(brain);
-    runner.open();
+    await runner.open();
     runner.session.state = "schedule";
     runner.session.slots = { symptomId: "washer_not_draining", offeredSlotIds: ["tech_dana:2026-09-23T15:00:00.000Z"] };
 
@@ -295,7 +295,7 @@ describe("booking safety", () => {
       { brain, calendar, messaging, customers: new CustomerRepository(), now: () => NOW, idFactory: (p) => `${p}_1` },
       "call_cal_fail",
     );
-    runner.open();
+    await runner.open();
     runner.session.state = "schedule";
     runner.session.slots = { symptomId: "washer_not_draining", offeredSlotIds: [slotId] };
 
@@ -316,7 +316,7 @@ describe("booking safety", () => {
       { say: "Booking again.", toolCalls: [{ id: "t2", name: "book_appointment", args }] },
     ]);
     const { runner, calendar } = makeRunner(brain);
-    runner.open();
+    await runner.open();
     runner.session.state = "schedule";
     runner.session.slots = { symptomId: "washer_not_draining", offeredSlotIds: [slotId] };
 
@@ -353,7 +353,7 @@ describe("redaction", () => {
   it("redacts the persisted session without touching the live one", async () => {
     const { runner } = makeRunner();
     runner.setFromNumber("+14155550142");
-    runner.open();
+    await runner.open();
     await runner.turn("my fridge is not cooling");
 
     expect(runner.redactedSession().fromNumber).toBe("***-***-0142");
