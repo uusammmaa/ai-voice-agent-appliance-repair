@@ -1,0 +1,42 @@
+{
+  "name": "ai-voice-agent-appliance-repair",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production-grade AI voice agent for an appliance repair company: triage, quoting, Google Calendar booking and messenger notifications.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:evals": "vitest run tests/evals",
+    "test:e2e": "playwright test",
+    "eval:report": "tsx src/evals/report.ts",
+    "verify": "npm run typecheck && npm run lint && npm run test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
+    "googleapis": "^144.0.0",
+    "next": "^16.3.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "eslint": "^9.36.0",
+    "eslint-config-next": "^16.3.5",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
